@@ -93,8 +93,8 @@ def composite_score(images, faces):
 
 
 
-folder = 'album_images'
-ims = ['76.jpg', '75.jpg']  # Add more image filenames as needed
+folder = './'
+ims = ['nara_shyam1.jpg', 'nara_shyam2.jpg']  # Add more image filenames as needed
 
 # Load images
 images = load_images_from_folder(folder, ims)
@@ -124,7 +124,7 @@ for i, encoding1 in enumerate(first_image_encodings):
         
         match_found = False
         for j, encoding2 in enumerate(current_encodings):
-            match = face_recognition.compare_faces([encoding1], encoding2, tolerance=0.2)  # Adjust tolerance as needed
+            match = face_recognition.compare_faces([encoding1], encoding2, tolerance=0.5)  # Adjust tolerance as needed
             if match[0]:
                 matches.append(current_locations[j])
                 match_found = True
@@ -158,70 +158,8 @@ for face in face_matches_dict:
 
 
 
-superior_image = face_matches_dict['Face 2']
-top,right,bottom,left = (1420, 2459, 1687, 2192)
+superior_image = face_matches_dict['Face 0']
+top,right,bottom,left = (554, 464, 644, 374)
 inferior_image = images[0][1][top:bottom, left:right].copy()
 superior_image = cv2.resize(superior_image, (inferior_image.shape[1], inferior_image.shape[0]))
 
-
-# Function to get facial landmarks
-
-def get_landmarks(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    faces = detector(gray)
-    for face in faces:
-        landmarks = predictor(gray, face)
-        points = [(p.x, p.y) for p in landmarks.parts()]
-        return points
-    return None
-
-# Get landmarks for both faces
-inferior_landmarks = get_landmarks(inferior_image)
-superior_landmarks = get_landmarks(superior_image)
-
-# Function to align the superior face to the inferior face
-def align_faces(inferior_points, superior_points, superior_image):
-    # Convert points to NumPy arrays
-    inferior_points = np.array(inferior_points, dtype=np.float32)
-    superior_points = np.array(superior_points, dtype=np.float32)
-    
-    # Compute the affine transformation matrix
-    affine_transform = cv2.estimateAffinePartial2D(superior_points, inferior_points)[0]
-    
-    # Warp the superior face to align with the inferior face
-    aligned_face = cv2.warpAffine(superior_image, affine_transform, (inferior_image.shape[1], inferior_image.shape[0]))
-    return aligned_face
-
-aligned_superior_face = align_faces(inferior_landmarks, superior_landmarks, superior_image)
-
-# Create a mask for the face region
-mask = np.zeros_like(inferior_image)
-hull = cv2.convexHull(np.array(inferior_landmarks))
-cv2.fillConvexPoly(mask, hull, (255, 255, 255))
-
-# Extract face regions
-inferior_face_region = cv2.bitwise_and(inferior_image, mask)
-superior_face_region = cv2.bitwise_and(aligned_superior_face, mask)
-
-# Compute mean color values
-inferior_mean = cv2.mean(inferior_face_region, mask=cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY))
-superior_mean = cv2.mean(superior_face_region, mask=cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY))
-
-# Color correction
-correction_factors = (inferior_mean[0] / superior_mean[0], inferior_mean[1] / superior_mean[1], inferior_mean[2] / superior_mean[2])
-corrected_superior_face = np.zeros_like(aligned_superior_face)
-for c in range(3):
-    corrected_superior_face[:, :, c] = cv2.multiply(aligned_superior_face[:, :, c], correction_factors[c])
-
-
-# Define the mask for the source region
-source_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-cv2.imwrite('trg.jpg', inferior_image)
-
-# Find the seam using graph cut optimization
-seamless_image = cv2.seamlessClone(corrected_superior_face, inferior_image, source_mask, (inferior_landmarks[30][0], inferior_landmarks[30][1]), cv2.NORMAL_CLONE)
-
-images[0][1][top:bottom, left:right] = seamless_image
-
-# Save the final output
-cv2.imwrite('src.jpg', images[0][1])
