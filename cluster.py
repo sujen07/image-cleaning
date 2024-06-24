@@ -15,7 +15,6 @@ import re
 from scipy.spatial.distance import euclidean
 
 # Constants
-IMAGE_DIR = 'album_images'
 BATCH_SIZE = 32
 scaler = StandardScaler()
 
@@ -102,20 +101,15 @@ def calculate_image_distance(image_path1, image_path2):
     distance = euclidean(features1, features2)
     return distance
 
-def main():
+def main(folder_path):
     # Load model
     model = load_model()
 
     # Get images
-    images = get_images_from_folder(IMAGE_DIR)
+    images = get_images_from_folder(folder_path)
 
     # Extract features
     features = extract_features(model, [img for path, img in images])
-
-    # Print features before scaling
-    print("Features before scaling:")
-    for i, (path, _) in enumerate(images):
-        print(f"{path}: {features[i]}")
 
     # Scale features
     scaled_features = features #scaler.fit_transform(features)
@@ -125,26 +119,9 @@ def main():
     for i, (path, _) in enumerate(images):
         print(f"{path}: {scaled_features[i]}")
 
-    # Find optimal epsilon using k-distance graph
-    nearest_neighbors = NearestNeighbors(n_neighbors=4)
-    nearest_neighbors.fit(scaled_features)
-    distances, indices = nearest_neighbors.kneighbors(scaled_features)
-    sorted_distances = np.sort(distances[:, 3], axis=0)[::-1]
-
-    knee_locator = KneeLocator(range(len(sorted_distances)), sorted_distances, curve="convex", direction="decreasing")
-    optimal_eps = sorted_distances[knee_locator.knee]
-    plot_k_distance(sorted_distances, knee_locator)
-
-    print(f"Optimal eps estimated by KneeLocator is: {optimal_eps}")
-
     # DBSCAN clustering
     dbscan = DBSCAN(eps=10, min_samples=1)
     clusters = dbscan.fit_predict(scaled_features)
-
-    # TSNE for visualization
-    tsne = TSNE(n_components=2, random_state=0)
-    features_tsne = tsne.fit_transform(scaled_features)
-    plot_clusters(features_tsne, clusters)
 
     # Group images by clusters
     cluster_images = {i: [] for i in range(-1, max(clusters) + 1)}
@@ -153,4 +130,5 @@ def main():
     return cluster_images
 
 if __name__ == "__main__":
-     cluster_imgs = main()
+     folder_path = 'album_images'
+     cluster_imgs = main(folder_path)
